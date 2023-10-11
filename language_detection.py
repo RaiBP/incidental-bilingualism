@@ -1,11 +1,5 @@
-from datasets import load_dataset
-import glob
 import subprocess
-import sys
 import re
-from tqdm import tqdm
-import concurrent.futures
-
 
 def classify_instance(labels, N):
     consecutive_count = 1
@@ -33,27 +27,13 @@ def classify_instance(labels, N):
             current_sequence = [current_index]
         previous_label = label
 
-    return "mono" if ((not detected_languages) or (len(detected_languages) == 1)) else "bi", detected_languages, sequences_list, languages_list
+    return "mono" if ((not detected_languages) or (
+                len(detected_languages) == 1)) else "bi", detected_languages, sequences_list, languages_list
 
 
-# Add the directory containing the script to sys.path
-sys.path.append("")
-
-# Define a pattern to match the desired Arrow files
-file_pattern = "./Pile-CC--data-00000-of-00455--instances/data-0000*-of-00002.arrow"
-
-# Use glob to get a list of file paths that match the pattern
-file_paths = glob.glob(file_pattern)
-
-dataset = load_dataset("arrow", data_files=file_paths)
-
-# Specify the path to the Python script you want to run
-coswid_path = "/home/rai/Documents/MSCE/internship/code_switching_detection/coswid/src/coswid.py"
-
-
-def process_instance(instance):
+def process_instance(instance, coswid_path, coswid_model):
     try:
-        coswid_arguments = ["-m", "FILTER2", "-t", instance, "-c", "2", "-f", "0", "-g", "0.1", "-v", "dico"]
+        coswid_arguments = ["-m", coswid_model, "-t", instance, "-c", "2", "-f", "0", "-g", "0.1", "-v", "dico"]
         process = subprocess.Popen(["python3", coswid_path] + coswid_arguments, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE, text=True)
         stdout, stderr = process.communicate()
@@ -85,7 +65,6 @@ def process_instance(instance):
                 except IndexError:
                     continue
 
-                # print(f"Word: {word}, Label: {label}")  # Use strip() to remove leading/trailing whitespace
         if label_list:
             mono_or_bi, detected_langs, sequences, sequences_langs = classify_instance(label_list, 10)
 
@@ -94,22 +73,7 @@ def process_instance(instance):
                 sequences_words = [word_list[i] for i in sequence]
                 sequences_words_list.append(sequences_words)
 
-            if mono_or_bi == "bi":
-                print(f"\nCode-switching detected: {detected_langs}\n")
-                for index, sequence in enumerate(sequences_words_list):
-                    print(f"{sequences_langs[index]}: {sequence}\n")
+            return {'label': mono_or_bi, 'instances': sequences_words_list, 'languages': sequences_langs}
 
     except subprocess.CalledProcessError as e:
         print("Error running the script:", e)
-
-
-# Specify the number of worker processes based on your system's capabilities
-num_workers = 16
-
-# Create a tqdm progress br
-with tqdm(total=len(dataset["train"]["instances"])) as pbar:
-    with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
-        # Use tqdm to wrap the executor map for progress tracking#
-        for _ in tqdm(executor.map(process_instance, dataset["train"]["instances"]),
-                      total=len(dataset["train"]["instances"])):
-            pbar.update(1)  # Update the progress bar
