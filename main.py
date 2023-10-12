@@ -46,7 +46,7 @@ def get_instances(num_workers, ds, n_examples):
     # Create a tqdm progress bar
     with tqdm(total=n_examples) as pbar:
         with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
-            # Use tqdm to wrap the executor map for progress tracking#
+            # Use tqdm to wrap the executor map for progress tracking
             for bilingual_detection_list in executor.map(process_document, ds["text"]):
                 for instance_index, instance_dict in enumerate(bilingual_detection_list):
                     if instance_dict["label"] == "bi":
