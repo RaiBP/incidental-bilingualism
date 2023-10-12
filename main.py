@@ -41,21 +41,29 @@ def process_document(document):
 
 def get_instances(num_workers, ds, n_examples):
     data = []
+    results = {}
     example_index = 0
     # Create a tqdm progress bar
     with tqdm(total=n_examples) as pbar:
         with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
             # Use tqdm to wrap the executor map for progress tracking#
-            for bilingual_detection_list in tqdm(executor.map(process_document, ds["text"]), total=n_examples):
+            for bilingual_detection_list in executor.map(process_document, ds["text"]):
                 for instance_index, instance_dict in enumerate(bilingual_detection_list):
                     if instance_dict["label"] == "bi":
                         for index, group in enumerate(instance_dict["groups"]):
                             result_dict = {"text": " ".join(group), "label": instance_dict["languages"][index],
                                            'instance_idx': instance_index, 'example_idx': example_index}
                             data.append(result_dict)
+                    instance_languages = list(set(instance_dict["languages"]))
+                    instance_languages.sort()
+                    languages_string = "-".join(instance_languages)
+                    if languages_string in results.keys():
+                        results[languages_string] += 1  # increment the number of instances for this language pair
+                    else:
+                        results[languages_string] = 1  # initialize the number of instances for this language pair
                 example_index += 1
                 pbar.update(1)  # Update the progress bar
-    return pd.DataFrame(data)
+    return pd.DataFrame(data), results
 
 
 def parse_args():
@@ -84,9 +92,10 @@ def main():
 
     dataset = Dataset.from_file(file_path)
     n_examples = len(dataset)
-    dataframe = get_instances(args.num_workers, dataset, n_examples)
+    dataframe, results = get_instances(args.num_workers, dataset, n_examples)
     dataframe.to_csv(args.repo_id.replace("/", "___") + "___" + args.filename.split(".")[0].replace("/", "___") + \
                      "___" + "results.csv", index=False)
+    print(results)
 
 
 if __name__ == "__main__":
