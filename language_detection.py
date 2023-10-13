@@ -2,6 +2,8 @@ import subprocess
 import re
 from ftlangdetect import detect
 from iso639 import languages
+from translation_mining import (sentence_breaker, extract_embedded_and_primary_sentences, detect_translations,
+                                apply_filters)
 
 
 def replace_ambiguous_labels(labels, ambiguous_groups, ambiguous_groups_corrected_labels):
@@ -201,6 +203,19 @@ def process_instance(instance, coswid_path, coswid_model):
 
         if label_list:
             mono_or_bi, valid_groups, groups = classify_instance(label_list, word_list, prob_list, 10)
+            filtered_translation_pairs = []
+            if mono_or_bi == "bi":
+                sentences, sentence_labels = sentence_breaker(word_list, label_list)
+                if len(set(sentence_labels)) > 1:
+                    embedded_sentences, primary_sentences, embedded_label, primary_label \
+                        = extract_embedded_and_primary_sentences(sentences, sentence_labels)
+                    translation_pairs = detect_translations(embedded_sentences, primary_sentences)
+                    for (sentence_embedded, sentence_primary) in translation_pairs:
+                        if apply_filters(sentence_embedded, sentence_primary):
+                            filtered_translation_pairs.append({'embedded_sentence': sentence_embedded,
+                                                               'embedded_label': embedded_label,
+                                                               'primary_sentence': sentence_primary,
+                                                               'primary_label': primary_label})
 
             group_words_list = []
             group_language_list = []
@@ -210,7 +225,8 @@ def process_instance(instance, coswid_path, coswid_model):
                 group_words_list.append(group_words)
                 group_language_list.append(group_language)
 
-            return {'label': mono_or_bi, 'groups': group_words_list, 'languages': group_language_list}
+            return {'label': mono_or_bi, 'groups': group_words_list, 'languages': group_language_list,
+                    "translation_pairs": filtered_translation_pairs}
 
     except subprocess.CalledProcessError as e:
         print("Error running the script:", e)
