@@ -118,12 +118,12 @@ def classify_instance(labels, words, probs, consecutive_threshold=10, probabilit
     :param probability_threshold: The minimum average probability of the words in a group for it to not be considered an
         ambiguous group.
 
-    :return: A tuple containing the classification ("bi" or "mono"), the valid groups, and all the groups. Note that
-    groups are lists of indices of words in the instance.
+    :return: A tuple containing the classification ("bi" or "mono") and the valid groups. Note that groups are lists of
+    indices of words in the instance.
     """
     unique_labels = list(set(labels))
     if len(unique_labels) == 1 and unique_labels[0] != "unknown":
-        return "mono", [list(range(len(labels)))], [list(range(len(labels)))]
+        return "mono", [list(range(len(labels)))]
     groups = obtain_groups_from_labels(labels)
     average_prob = [sum([probs[i] for i in group]) / len(group) for group in groups]
     ambiguous_groups = [group for index, group in enumerate(groups) if average_prob[index] < probability_threshold]
@@ -133,8 +133,10 @@ def classify_instance(labels, words, probs, consecutive_threshold=10, probabilit
     valid_groups_indices = [index for index, group in enumerate(groups) if len(group) > consecutive_threshold]
 
     valid_groups = [groups[i] for i in valid_groups_indices]
-    valid_groups_labels = [labels[group[0]] for group in valid_groups]
-    return "bi" if len(set(valid_groups_labels)) > 1 else "mono", valid_groups, groups
+    valid_groups_tags = [labels[group[0]] for group in valid_groups]
+
+    label = "bi" if len(set(valid_groups_tags)) > 1 else "mono"
+    return label, valid_groups
 
 
 def format_label(label):
@@ -148,7 +150,7 @@ def format_label(label):
         return label
 
 
-def process_instance(instance, coswid_path, coswid_model):
+def process_instance_legacy(instance, coswid_path, coswid_model, tokenizer, model):
     try:
         coswid_arguments = ["-m", coswid_model, "-t", instance, "-c", "2", "-f", "0", "-g", "0.1", "-v", "dico"]
         process = subprocess.Popen(["python3", coswid_path] + coswid_arguments, stdout=subprocess.PIPE,
@@ -209,7 +211,7 @@ def process_instance(instance, coswid_path, coswid_model):
                 if len(set(sentence_labels)) > 1:
                     embedded_sentences, primary_sentences, embedded_label, primary_label \
                         = extract_embedded_and_primary_sentences(sentences, sentence_labels)
-                    translation_pairs = detect_translations(embedded_sentences, primary_sentences)
+                    translation_pairs = detect_translations(embedded_sentences, primary_sentences, tokenizer, model)
                     for (sentence_embedded, sentence_primary) in translation_pairs:
                         if apply_filters(sentence_embedded, sentence_primary):
                             filtered_translation_pairs.append({'embedded_sentence': sentence_embedded,
@@ -225,8 +227,85 @@ def process_instance(instance, coswid_path, coswid_model):
                 group_words_list.append(group_words)
                 group_language_list.append(group_language)
 
-            return {'label': mono_or_bi, 'groups': group_words_list, 'languages': group_language_list,
-                    "translation_pairs": filtered_translation_pairs}
+            return {'instance_label': mono_or_bi, 'instance_words': word_list, 'instance_tags': label_list,
+                    'instance_groups': group_words_list, 'instance_languages': group_language_list}
 
     except subprocess.CalledProcessError as e:
         print("Error running the script:", e)
+
+
+def detect_code_switching(instance, coswid_path, coswid_model, consecutive_threshold):
+    try:
+        coswid_output = code_switching_language_detector(coswid_model, coswid_path, instance)
+
+        label_list, prob_list, word_list = extract_coswid_results(coswid_output)
+
+        if label_list:
+            mono_or_bi, groups = classify_instance(label_list, word_list, prob_list, consecutive_threshold)
+
+            group_words_list = []
+            group_language_list = []
+            for group in groups:
+                group_words = [word_list[i] for i in group]
+                group_language = label_list[group[0]]
+                group_words_list.append(group_words)
+                group_language_list.append(group_language)
+
+            return mono_or_bi, word_list, label_list, group_words_list, group_language_list
+
+    except subprocess.CalledProcessError as e:
+        print("Error running the script:", e)
+
+
+def extract_coswid_results(coswid_output):
+    # Define the regular expression pattern
+    pattern = r'Thresholding :'
+    pattern2 = r'\)\s*\n\[\d+\] : '
+    # Split the string based on the pattern
+    first_split = re.split(pattern, coswid_output)
+    # we don't need the first part
+    first_split = first_split[1:]
+    parts = []
+    for part in first_split:
+        parts.append(re.split(pattern2, part)[0])
+
+    word_list = []
+    label_list = []
+    prob_list = []
+    # Loop through the parts and print them
+    for index, part in enumerate(parts):
+        # Split the part into lines and select the last line
+        lines = part.strip().splitlines()
+        if lines:
+            last_line = lines[-1]
+            try:
+                pattern = r'(.+?)\s*:\s*(\w+)\s*\((\d+\.\d+)'
+                if ' => ' in last_line:
+                    # CoSwID outputs multiple labels
+                    last_line_single_label = last_line.split(" : ")[0] + " : " + last_line.split(' => ')[1]
+                else:
+                    # CoSwID outputs a single label
+                    last_line_single_label = last_line
+                match = re.search(pattern, last_line_single_label)
+
+                try:
+                    word = match.group(1)
+                    label = match.group(2)
+                    prob = float(match.group(3))
+                except AttributeError:
+                    continue
+
+                word_list.append(word)
+                label_list.append(format_label(label))
+                prob_list.append(prob)
+            except IndexError:
+                continue
+    return label_list, prob_list, word_list
+
+
+def code_switching_language_detector(coswid_model, coswid_path, instance):
+    coswid_arguments = ["-m", coswid_model, "-t", instance, "-c", "2", "-f", "0", "-g", "0.1", "-v", "dico"]
+    process = subprocess.Popen(["python3", coswid_path] + coswid_arguments, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, text=True)
+    stdout, stderr = process.communicate()
+    return stdout

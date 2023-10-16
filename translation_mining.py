@@ -1,6 +1,6 @@
 import torch
 from tqdm import tqdm
-from transformers import BertModel, BertTokenizerFast
+from transformers import BertTokenizerFast
 import torch.nn.functional as F
 from nltk.tokenize import sent_tokenize
 import nltk
@@ -15,8 +15,6 @@ except LookupError:
     # 'punkt' data is not downloaded, so download it
     nltk.download('punkt')
 
-
-
 # Load the mBERT tokenizer
 multi_tokenizer = BertTokenizerFast.from_pretrained("bert-base-multilingual-cased")
 
@@ -30,23 +28,21 @@ def get_similarity_score(embeddings1, embeddings2):
     return similarity_matrix
 
 
-def get_embeddings(sentences):
-    tokenizer = BertTokenizerFast.from_pretrained("setu4993/LaBSE")
-    model = BertModel.from_pretrained("setu4993/LaBSE")
-
-    model = model.eval()
-
-    inputs = tokenizer(sentences, return_tensors="pt", padding=True)
+def get_embeddings(sentences, tokenizer, model):
+    inputs = tokenizer(sentences, return_tensors="pt", padding=True, truncation=True, max_length=512)
 
     with torch.no_grad():
-        outputs = model(**inputs)
+        try:
+            outputs = model(**inputs)
+        except RuntimeError:
+            print("here")
 
     return outputs.pooler_output
 
 
-def detect_translations(sentences_embedded, sentences_primary, threshold=0.6):
-    embeddings_embedded = get_embeddings(sentences_embedded)
-    embeddings_primary = get_embeddings(sentences_primary)
+def detect_translations(sentences_embedded, sentences_primary, tokenizer, model, threshold=0.6):
+    embeddings_embedded = get_embeddings(sentences_embedded, tokenizer, model)
+    embeddings_primary = get_embeddings(sentences_primary, tokenizer, model)
 
     similarity_matrix = get_similarity_score(embeddings_embedded, embeddings_primary)
 
@@ -74,14 +70,15 @@ def sentence_breaker(words, labels):
         # Get the labels for words in the sentence
         sentence_labels = [labels[words.index(word)] for word in sentence_words if word in words]
 
-        # Count the occurrences of each label in the sentence
-        label_counts = Counter(sentence_labels)
+        if sentence_labels:
+            # Count the occurrences of each label in the sentence
+            label_counts = Counter(sentence_labels)
 
-        # Find the label with the highest count (majority voting)
-        majority_label = label_counts.most_common(1)[0][0]
+            # Find the label with the highest count (majority voting)
+            majority_label = label_counts.most_common(1)[0][0]
 
-        sentence_list.append(sentence)
-        sentence_label_list.append(majority_label)
+            sentence_list.append(sentence)
+            sentence_label_list.append(majority_label)
 
     return sentence_list, sentence_label_list
 
@@ -128,9 +125,18 @@ def get_language_detection_filter(sentence_1, sentence_2):
     return lang1 != lang2
 
 
+def contains_letters(sentence):
+    return any(char.isalpha() for char in sentence)
+
+
 def apply_filters(sentence_1, sentence_2, min_length=3, max_length=200, max_ratio=2.0, min_edit_distance=2,
                   min_edit_distance_ratio=0.1):
     global multi_tokenizer
+
+    # if any of the sentences does not contain letters, return False
+    if not contains_letters(sentence_1) or not contains_letters(sentence_2):
+        return False
+
     # Tokenize sentences using the mBERT tokenizer
     tokens_1 = multi_tokenizer.tokenize(sentence_1)
     tokens_2 = multi_tokenizer.tokenize(sentence_2)
