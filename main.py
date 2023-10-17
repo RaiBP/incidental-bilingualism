@@ -1,7 +1,6 @@
 import json
 import os
 import re
-import pandas as pd
 from functools import partial
 from transformers import GPT2TokenizerFast, BertModel, BertTokenizerFast
 from huggingface_hub import hf_hub_download
@@ -12,6 +11,10 @@ import argparse
 from language_detection import detect_code_switching
 from translation_mining import (sentence_breaker, extract_embedded_and_primary_sentences, apply_filters,
                                 detect_translations)
+import warnings
+
+# Suppressing the warning
+warnings.filterwarnings("ignore", message=".*sequence length is longer than the specified maximum sequence length.*")
 
 
 # Define a function to split text into 1024-token instances
@@ -61,7 +64,7 @@ def bilingual_detection(num_workers, dataset, language_detector_path,
                                        language_detector_model=language_detector_model,
                                        consecutive_threshold=consecutive_threshold)
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
         results = list(tqdm(executor.map(partial_process_document, dataset["instance_text"]), total=n_examples,
                             desc=f"Classifying instances between monolingual and bilingual"))
 

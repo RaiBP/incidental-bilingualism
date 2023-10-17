@@ -1,0 +1,12 @@
+python-daemon
+iso-639
+transformers
+fasttext-langdetect
+tqdm
+pandas
+datasets
+torch
+nltk
+numpy
+levenshtein
+huggingface_hub

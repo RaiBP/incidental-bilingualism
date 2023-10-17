@@ -1,5 +1,4 @@
 import torch
-from tqdm import tqdm
 from transformers import BertTokenizerFast
 import torch.nn.functional as F
 from nltk.tokenize import sent_tokenize
@@ -35,14 +34,16 @@ def get_embeddings(sentences, tokenizer, model):
         try:
             outputs = model(**inputs)
         except RuntimeError:
-            print("here")
-
+            return None
     return outputs.pooler_output
 
 
 def detect_translations(sentences_embedded, sentences_primary, tokenizer, model, threshold=0.6):
     embeddings_embedded = get_embeddings(sentences_embedded, tokenizer, model)
     embeddings_primary = get_embeddings(sentences_primary, tokenizer, model)
+
+    if embeddings_embedded is None or embeddings_primary is None:
+        return []
 
     similarity_matrix = get_similarity_score(embeddings_embedded, embeddings_primary)
 

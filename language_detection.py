@@ -2,8 +2,6 @@ import subprocess
 import re
 from ftlangdetect import detect
 from iso639 import languages
-from translation_mining import (sentence_breaker, extract_embedded_and_primary_sentences, detect_translations,
-                                apply_filters)
 
 
 def replace_ambiguous_labels(labels, ambiguous_groups, ambiguous_groups_corrected_labels):
@@ -148,90 +146,6 @@ def format_label(label):
             return "unknown"
     else:
         return label
-
-
-def process_instance_legacy(instance, coswid_path, coswid_model, tokenizer, model):
-    try:
-        coswid_arguments = ["-m", coswid_model, "-t", instance, "-c", "2", "-f", "0", "-g", "0.1", "-v", "dico"]
-        process = subprocess.Popen(["python3", coswid_path] + coswid_arguments, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, text=True)
-        stdout, stderr = process.communicate()
-
-        # Define the regular expression pattern
-        pattern = r'Thresholding :'
-        pattern2 = r'\)\s*\n\[\d+\] : '
-
-        # Split the string based on the pattern
-        first_split = re.split(pattern, stdout)
-
-        # we don't need the first part
-        first_split = first_split[1:]
-        parts = []
-        for part in first_split:
-            parts.append(re.split(pattern2, part)[0])
-
-        word_list = []
-        label_list = []
-        prob_list = []
-
-        # Loop through the parts and print them
-        for index, part in enumerate(parts):
-            # Split the part into lines and select the last line
-            lines = part.strip().splitlines()
-            if lines:
-                last_line = lines[-1]
-                try:
-                    pattern = r'(.+?)\s*:\s*(\w+)\s*\((\d+\.\d+)'
-                    if ' => ' in last_line:
-                        # CoSwID outputs multiple labels
-                        last_line_single_label = last_line.split(" : ")[0] + " : " + last_line.split(' => ')[1]
-                    else:
-                        # CoSwID outputs a single label
-                        last_line_single_label = last_line
-                    match = re.search(pattern, last_line_single_label)
-
-                    try:
-                        word = match.group(1)
-                        label = match.group(2)
-                        prob = float(match.group(3))
-                    except AttributeError:
-                        continue
-
-                    word_list.append(word)
-                    label_list.append(format_label(label))
-                    prob_list.append(prob)
-                except IndexError:
-                    continue
-
-        if label_list:
-            mono_or_bi, valid_groups, groups = classify_instance(label_list, word_list, prob_list, 10)
-            filtered_translation_pairs = []
-            if mono_or_bi == "bi":
-                sentences, sentence_labels = sentence_breaker(word_list, label_list)
-                if len(set(sentence_labels)) > 1:
-                    embedded_sentences, primary_sentences, embedded_label, primary_label \
-                        = extract_embedded_and_primary_sentences(sentences, sentence_labels)
-                    translation_pairs = detect_translations(embedded_sentences, primary_sentences, tokenizer, model)
-                    for (sentence_embedded, sentence_primary) in translation_pairs:
-                        if apply_filters(sentence_embedded, sentence_primary):
-                            filtered_translation_pairs.append({'embedded_sentence': sentence_embedded,
-                                                               'embedded_label': embedded_label,
-                                                               'primary_sentence': sentence_primary,
-                                                               'primary_label': primary_label})
-
-            group_words_list = []
-            group_language_list = []
-            for group in valid_groups:
-                group_words = [word_list[i] for i in group]
-                group_language = label_list[group[0]]
-                group_words_list.append(group_words)
-                group_language_list.append(group_language)
-
-            return {'instance_label': mono_or_bi, 'instance_words': word_list, 'instance_tags': label_list,
-                    'instance_groups': group_words_list, 'instance_languages': group_language_list}
-
-    except subprocess.CalledProcessError as e:
-        print("Error running the script:", e)
 
 
 def detect_code_switching(instance, coswid_path, coswid_model, consecutive_threshold):
