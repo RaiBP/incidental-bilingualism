@@ -1,7 +1,7 @@
 # Detecting Unintentional Bilingual and Translation Instances in NLP Datasets
 Python implementation of Google's "*Searching for Needles in a Haystack*: On the Role of Incidental Bilingualism in PaLM’s Translation Capability" (Briakou et al. 2023),
 using open source tools. Some differences with respect to the paper:
-1. Laurent (2022)'s CoSwID model is used for per-token language detection, instead of Google's CMX model (Zhang et al., 2018).
+1. Per-token language detection is done with Kevers (2022)'s CoSwID model, instead of Google's CMX model (Zhang et al., 2018).
 2. In case the CoSwID model is very unsure over a sequence of tokens, we use Facebook's FastText-langdetect (Joulin et al., 2016) to label the entire uncertain sequence.
 
 ## Installation
