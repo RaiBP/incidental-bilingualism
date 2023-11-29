@@ -72,3 +72,6 @@ TODO
 - Zhang, Y., Riesa, J., Gillick, D., Bakalov, A., Baldridge, J., & Weiss, D. (2018). A Fast, Compact, Accurate Model for Language Identification of Codemixed Text. *arXiv preprint* arXiv:1810.04142. [[Link](http://arxiv.org/abs/1810.04142)]
 - Joulin, A., Grave, E., Bojanowski, P., Douze, M., Jégou, H., & Mikolov, T. (2016). FastText.zip: Compressing text classification models. *arXiv preprint* arXiv:1612.03651. [[Link](https://arxiv.org/abs/1612.03651)]
 - Joulin, A., Grave, E., Bojanowski, P., & Mikolov, T. (2016). Bag of tricks for efficient text classification. *arXiv preprint* arXiv:1607.01759. [[Link](https://arxiv.org/abs/1607.01759)]
+
+## License
+The source code in this repository falls under the MIT License. For CoSwID's license, please refer to its [repository](https://github.com/lkevers/coswid).
