@@ -27,7 +27,7 @@ def split_text_into_instances(document, tokenizer, max_tokens=1024):
             instance_tokens = tokens[i:i + max_tokens]
             batch_instance_tokens.append(instance_tokens)
         instances_decoded.append(tokenizer.batch_decode(batch_instance_tokens, skip_special_tokens=True))
-    return {'instance_text': instances_decoded}
+    return {'instance_text': instances_decoded, 'document_id': document['document_id']}
 
 
 def process_document(document, language_detector_path, language_detector_model, consecutive_threshold):
@@ -36,6 +36,7 @@ def process_document(document, language_detector_path, language_detector_model, 
     instance_tags_list = []
     instance_groups_list = []
     instance_languages_list = []
+    instance_document_id = -1
 
     for instance in document:
         instance_results = detect_code_switching(instance, language_detector_path, language_detector_model,
@@ -47,8 +48,10 @@ def process_document(document, language_detector_path, language_detector_model, 
             instance_tags_list.append(instance_tags)
             instance_groups_list.append(instance_groups)
             instance_languages_list.append(instance_languages)
+            instance_document_id = document['document_id']
 
-    return instance_label_list, instance_words_list, instance_tags_list, instance_groups_list, instance_languages_list
+    return (instance_label_list, instance_words_list, instance_tags_list, instance_groups_list, instance_languages_list,
+            instance_document_id)
 
 
 def bilingual_detection(num_workers, dataset, language_detector_path,
@@ -59,6 +62,7 @@ def bilingual_detection(num_workers, dataset, language_detector_path,
     document_tags_list = []
     document_groups_list = []
     document_languages_list = []
+    document_id_list = []
 
     partial_process_document = partial(process_document, language_detector_path=language_detector_path,
                                        language_detector_model=language_detector_model,
@@ -69,16 +73,18 @@ def bilingual_detection(num_workers, dataset, language_detector_path,
                             desc=f"Classifying instances between monolingual and bilingual"))
 
     for document_results in results:
-        instances_label, instances_words, instances_tags, instances_groups, instances_languages = document_results
+        instances_label, instances_words, instances_tags, instances_groups, instances_languages, instance_document_id =\
+            document_results
         document_label_list.append(instances_label)
         document_words_list.append(instances_words)
         document_tags_list.append(instances_tags)
         document_groups_list.append(instances_groups)
         document_languages_list.append(instances_languages)
+        document_id_list.append(instance_document_id)
 
     results_dict = {'instance_labels': document_label_list, 'instance_words': document_words_list,
                     'instance_tags': document_tags_list, 'instance_groups': document_groups_list,
-                    'instance_languages': document_languages_list}
+                    'instance_languages': document_languages_list, 'instance_document_id': document_id_list}
     return Dataset.from_dict(results_dict)
 
 
@@ -94,7 +100,7 @@ def translation_detection(dataset):
     instance_index_list = []
     document_index_list = []
 
-    for document_index, document in tqdm(enumerate(dataset), desc="Finding translation pairs", total=len(dataset)):
+    for document_index, document in tqdm(enumerate(dataset), desc="Finding openwebtext2_0 pairs", total=len(dataset)):
         for instance_index, instance_label in enumerate(document['instance_labels']):
             if instance_label == "bi":
                 sentences, sentence_labels = sentence_breaker(document['instance_words'][instance_index],
@@ -172,6 +178,8 @@ def main():
         os.makedirs(results_folder)
 
     dataset = Dataset.from_file(file_path)
+    document_ids = range(len(dataset))
+    dataset = dataset.add_column('document_id', document_ids)
 
     if 'instance_text' not in dataset.column_names:
         instances_dataset = dataset.map(

@@ -142,7 +142,7 @@ def format_label(label):
         try:
             language = languages.get(part3=label)
             return language.part1 if language else "unknown"
-        except AttributeError:
+        except (AttributeError, KeyError):
             return "unknown"
     else:
         return label
