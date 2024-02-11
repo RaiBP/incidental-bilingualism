@@ -81,10 +81,8 @@ if __name__ == "__main__":
 
     examples_list = []
     small_examples_list = []
-    print("Made it here")
     for result in results:
         examples_list.extend(result["examples"])
         small_examples_list.extend(result["small_examples"])
-    print("Here too")
     dataset_formatted = get_dataset(examples_list, small_examples_list, newline_id)
     dataset_formatted.push_to_hub("RaiBP/openwebtext2-first-30-chunks-nonenglish-examples")
