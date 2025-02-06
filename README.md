@@ -1,6 +1,9 @@
 # Detecting Unintentional Bilingual and Translation Instances in NLP Datasets
-Python implementation of Google's "*Searching for Needles in a Haystack*: On the Role of Incidental Bilingualism in PaLM’s Translation Capability" (Briakou et al. 2023),
-using open source tools. Some differences with respect to the paper:
+This repository contains code developed as part of a research internship at the Machine Learning Professorship at the Technical University of Munich (TUM). The project implements Google's "*Searching for Needles in a Haystack*: On the Role of Incidental Bilingualism in PaLM's Translation Capability" (Briakou et al. 2023) using open source tools.
+
+The codebase is mainly aimed at reproduction of research results detailed in `internship_report.pdf`, but the main script can be used by anyone looking to detect bilingual and translation instances in their NLP datasets.
+
+Some differences with respect to the original paper:
 1. Per-token language detection is done with Kevers (2022)'s CoSwID model, instead of Google's CMX model (Zhang et al., 2018).
 2. In case the CoSwID model is very unsure over a subsequent series of tokens, we use Facebook's FastText-langdetect (Joulin et al., 2016) to label the entire uncertain sequence.
 
@@ -61,10 +64,30 @@ The results will be written to the default.out file.
 
 Once the `coswid.py` script is working properly, you can move on to the next step.
 
-### 2. TODO
-
+### 2. Install Required Dependencies
+Install the Python packages:
+```pip install -r requirements.txt```
 ## Usage
-TODO
+To detect bilingual and translation instances in your dataset:
+```bash
+python main.py --repo_id REPO_ID --filename FILENAME [options]
+
+Required arguments:
+--repo_id        # HuggingFace dataset repository ID
+--filename       # File to process within the repository
+
+Optional arguments:
+--max_tokens     # Maximum tokens per instance (default: 1024)
+--num_workers    # Number of parallel workers (default: 1) 
+--N              # Minimum consecutive tokens threshold (default: 10)
+--coswid_model   # CoSwID model name (default: FILTER2)
+--coswid_path    # Path to coswid.py (default: ./coswid/src/coswid.py)
+--cache_dir      # Cache directory for downloaded files
+```
+
+This will identify monolingual, bilingual and translation instances in your dataset using CoSwID for language detection and LABSE for translation detection.
+The script outputs results in HuggingFace dataset format containing instance labels and language information, ready for downstream tasks or analysis.
+
 
 ## References
 - Briakou, E., Cherry, C., & Foster, G. (2023). Searching for Needles in a Haystack: On the Role of Incidental Bilingualism in PaLM’s Translation Capability. *arXiv preprint* arXiv:2305.10266. [[Link](http://arxiv.org/abs/2305.10266)]
