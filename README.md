@@ -1,5 +1,5 @@
 # Detecting Unintentional Bilingual and Translation Instances in NLP Datasets
-This repository contains code developed as part of a research internship at the Machine Learning Professorship at the Technical University of Munich (TUM). The project implements Google's "*Searching for Needles in a Haystack*: On the Role of Incidental Bilingualism in PaLM's Translation Capability" (Briakou et al. 2023) using open source tools.
+This repository contains code developed as part of a research internship at the Machine Learning Professorship at the Technical University of Munich (TUM). The project implements Google's "*Searching for Needles in a Haystack*: On the Role of Incidental Bilingualism in PaLM's Translation Capability" (Briakou et al. 2023) using open source tools and GPT-2 as the language model of study.
 
 The codebase is mainly aimed at reproduction of research results detailed in `internship_report.pdf`, but the main script can be used by anyone looking to detect bilingual and translation instances in their NLP datasets.
 
@@ -7,10 +7,12 @@ Some differences with respect to the original paper:
 1. Per-token language detection is done with Kevers (2022)'s CoSwID model, instead of Google's CMX model (Zhang et al., 2018).
 2. In case the CoSwID model is very unsure over a subsequent series of tokens, we use Facebook's FastText-langdetect (Joulin et al., 2016) to label the entire uncertain sequence.
 
+More details about how the ablated GPT-2 models were trained are available at [HuggingFace](https://huggingface.co/RaiBP), in their respective card.
+
 ## Installation
 ### 1. Install CoSwID as indicated in the CoSwID [repository](https://github.com/lkevers/coswid):
 1. Install the pre-requisites.
-   
+
 Required libraries:
 ```
 unzip
